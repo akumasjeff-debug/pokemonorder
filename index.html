@@ -12,8 +12,8 @@
         .step { margin-bottom: 25px; padding: 20px; border-radius: 4px;}
         .step-1-2 { border-left: 5px solid #3498db; background-color: #ebf5fb; }
         .step-3 { border-left: 5px solid #9b59b6; background-color: #f4ecf7; }
+        .step-4 { border-left: 5px solid #e67e22; background-color: #fdf2e9; } /* 步驟 4 的橘色風格 */
         
-        /* 表格外框與捲軸設計 */
         .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; margin-top: 10px; background: white; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle;}
@@ -21,6 +21,8 @@
         th { background-color: #f2f2f2; color: #333; position: sticky; top: 0; z-index: 1; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
         
         input[type="text"] { width: 90%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px;}
+        input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; margin-left: 10px; font-family: sans-serif;}
+        
         .matched-result { font-weight: bold; color: #7f8c8d; font-size: 15px;}
         .order-result { font-weight: bold; color: #7f8c8d; font-size: 15px;}
         
@@ -36,6 +38,8 @@
         .primary-btn:hover { background-color: #2980b9; }
         .purple-btn { background-color: #8e44ad; }
         .purple-btn:hover { background-color: #9b59b6; }
+        .orange-btn { background-color: #e67e22; }
+        .orange-btn:hover { background-color: #d35400; }
         
         .export-btn { background-color: #27ae60; color: white; border: none; padding: 14px 20px; font-size: 18px; cursor: pointer; border-radius: 4px; width: 100%; font-weight: bold; margin-top: 15px; display: none;}
         .export-btn:hover { background-color: #2ecc71; }
@@ -75,20 +79,26 @@
 
     <div class="step step-1-2">
         <h3>步驟 2：上傳對照用的 Excel (總表) 抓取商品編號</h3>
-        <p style="color: #555; font-size: 14px;">支援多選檔案合併比對。</p>
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" multiple />
         <button id="matchBtn" class="primary-btn">🔍 載入總表並抓取商品編號</button>
-        
         <button id="exportBtn2" class="export-btn">⬇️ 步驟 2 完成：匯出包含【商品編號】的 Excel</button>
     </div>
 
     <div class="step step-3">
         <h3>步驟 3 (選用)：上傳單號 Excel 抓取對應單號</h3>
-        <p style="color: #555; font-size: 14px;">上傳包含「單號」與「商品編號」的 Excel，系統會利用步驟 2 找到的商品編號，自動為您反查單號。</p>
         <input type="file" id="step3FileInput" accept=".xlsx, .xls, .csv" />
         <button id="step3MatchBtn" class="primary-btn purple-btn">🏷️ 載入檔案並抓取單號</button>
-        
         <button id="exportBtn3" class="export-btn">⬇️ 步驟 3 完成：匯出包含【單號】的最終 Excel</button>
+    </div>
+
+    <div class="step step-4">
+        <h3>步驟 4 (選用)：產生預約進貨單</h3>
+        <p style="color: #555; font-size: 14px;">請選擇進貨日期，系統將抓取上方的【單號】與【數量】，匯出格式化的預約進貨單。</p>
+        <div style="margin-top: 15px; margin-bottom: 15px; font-weight: bold; color: #333;">
+            <label for="appointmentDate">📅 預約進貨日：</label>
+            <input type="date" id="appointmentDate" />
+        </div>
+        <button id="exportBtn4" class="primary-btn orange-btn">⬇️ 產生並匯出【預約進貨單】</button>
     </div>
 
 </div>
@@ -96,7 +106,6 @@
 <script>
     let finalExportData = [];
 
-    // --- 共用的 UI 控制功能 ---
     function setStatus(text, color, bgColor = 'transparent') {
         const statusDiv = document.getElementById('status');
         statusDiv.innerText = text;
@@ -109,7 +118,6 @@
         document.getElementById('exportBtn3').style.display = 'none';
     }
 
-    // --- UI 功能：新增、刪除、清空 ---
     function addRow() {
         const tbody = document.getElementById('dataBody');
         const tr = document.createElement('tr');
@@ -139,25 +147,20 @@
 
     for(let i=0; i<5; i++) addRow();
 
-    // --- 貼上功能與輸入監聽 ---
     document.getElementById('dataBody').addEventListener('paste', function(e) {
         if (e.target.tagName !== 'INPUT') return;
         e.preventDefault(); 
-        
         const text = (e.clipboardData || window.clipboardData).getData('text');
         if (!text) return;
-
         const rows = text.split(/\r?\n/);
         const targetInput = e.target;
         const isPartNo = targetInput.classList.contains('part-no');
         const isQty = targetInput.classList.contains('qty');
-        
         let currentRow = targetInput.closest('tr');
 
         rows.forEach(rowText => {
             if (rowText.trim() === '') return; 
             if (!currentRow) currentRow = addRow();
-
             const cols = rowText.split(/\t/);
             if (isPartNo) {
                 currentRow.querySelector('.part-no').value = cols[0].trim();
@@ -170,10 +173,8 @@
             currentRow.querySelector('.order-result').innerText = '-';
             currentRow.querySelector('.order-result').style.color = '#7f8c8d';
             delete currentRow.dataset.matchedId; 
-
             currentRow = currentRow.nextElementSibling;
         });
-
         hideAllExportButtons();
         setStatus('💡 資料已更新，請從步驟 2 重新比對。', '#3498db', '#ebf5fb');
     });
@@ -186,13 +187,12 @@
             tr.querySelector('.order-result').innerText = '-';
             tr.querySelector('.order-result').style.color = '#7f8c8d';
             delete tr.dataset.matchedId;
-
             hideAllExportButtons();
             setStatus('⚠️ 資料已手動修改，請重新比對。', '#e67e22', '#fdf2e9');
         }
     });
 
-    // --- 步驟 2：多重檔案預覽比對 (抓商品編號) ---
+    // --- 步驟 2：抓商品編號 ---
     document.getElementById('matchBtn').addEventListener('click', function() {
         hideAllExportButtons();
         setStatus("讀取總表並比對商品編號中...", "#333");
@@ -201,7 +201,7 @@
         const trs = document.querySelectorAll('#dataBody tr');
         trs.forEach(tr => {
             if (tr.querySelector('.part-no').value.trim() !== '') hasInput = true;
-            tr.querySelector('.order-result').innerText = '-'; // 每次按步驟2，清空單號區
+            tr.querySelector('.order-result').innerText = '-'; 
         });
 
         if (!hasInput) {
@@ -295,26 +295,22 @@
                     '商品編號': matchedId || '⚠️找不到',
                     '數量': qInput,
                     '採購進貨成本': ''
-                    // 注意：此時尚未加入單號欄位
                 });
             });
 
             if (notFoundCount > 0) {
                 setStatus(`⚠️ 步驟 2 比對完成！有 ${notFoundCount} 筆找不到商品編號。\n您可以選擇直接匯出，或是繼續執行步驟 3。`, "#e67e22", '#fdf2e9');
             } else {
-                setStatus(`✅ 步驟 2 比對完成！\n您可以選擇直接匯出，或是繼續執行步驟 3 抓取單號。`, "#27ae60", '#eaaf1');
+                setStatus(`✅ 步驟 2 比對完成！\n您可以選擇直接匯出，或是繼續執行步驟 3 抓取單號。`, "#27ae60", '#eafaf1');
             }
-            
-            // 顯示步驟 2 專屬的匯出按鈕
             document.getElementById('exportBtn2').style.display = "block";
-
         }).catch(error => {
             console.error(error);
             setStatus("⚠️ 處理檔案時發生錯誤，請確認 Excel 格式。", "#c0392b", '#fdedec');
         });
     });
 
-    // --- 步驟 3：上傳單號 Excel (抓單號) ---
+    // --- 步驟 3：抓單號 ---
     document.getElementById('step3MatchBtn').addEventListener('click', function() {
         if (finalExportData.length === 0) {
             setStatus("⚠️ 請先完成「步驟 2」取得商品編號後，再來抓取單號！", "#c0392b", '#fdedec');
@@ -328,7 +324,6 @@
         }
 
         setStatus("比對單號中...", "#333");
-        // 隱藏步驟 2 的匯出按鈕，避免使用者按錯
         document.getElementById('exportBtn2').style.display = 'none';
 
         const reader = new FileReader();
@@ -383,7 +378,7 @@
                         if (orderNo) {
                             orderSpan.innerText = `✅ ${orderNo}`;
                             orderSpan.style.color = "#8e44ad"; 
-                            finalExportData[dataIndex]['單號'] = orderNo; // 加入單號欄位
+                            finalExportData[dataIndex]['單號'] = orderNo; 
                         } else {
                             orderSpan.innerText = `❌ 找不到單號`;
                             orderSpan.style.color = "#e74c3c";
@@ -401,10 +396,7 @@
                 } else {
                     setStatus(`🎉 步驟 3 完美比對完成！所有商品皆已找到單號。\n請點擊下方按鈕匯出最終 Excel。`, "#8e44ad", '#f4ecf7');
                 }
-
-                // 顯示步驟 3 專屬的匯出按鈕
                 document.getElementById('exportBtn3').style.display = "block";
-
             } catch (error) {
                 console.error(error);
                 setStatus("⚠️ 步驟 3 處理檔案時發生錯誤，請確認 Excel 格式。", "#c0392b", '#fdedec');
@@ -413,22 +405,70 @@
         reader.readAsArrayBuffer(fileInput.files[0]);
     });
 
-    // --- 共用的匯出 Excel 功能 ---
+    // --- 匯出功能 1：步驟 2 & 3 共用的原版匯出 ---
     function exportExcel() {
         if (finalExportData.length === 0) return;
-
         const newSheet = XLSX.utils.json_to_sheet(finalExportData);
         const newWorkbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(newWorkbook, newSheet, "進貨清單");
-        
         XLSX.writeFile(newWorkbook, "進貨匯出結果.xlsx");
-        
-        setStatus("🎉 檔案已成功匯出下載！", "#27ae60", '#eaaf1');
+        setStatus("🎉 檔案已成功匯出下載！", "#27ae60", '#eafaf1');
     }
 
-    // 將兩個按鈕綁定到同一個匯出函式
     document.getElementById('exportBtn2').addEventListener('click', exportExcel);
     document.getElementById('exportBtn3').addEventListener('click', exportExcel);
+
+    // --- 匯出功能 2：步驟 4 全新專屬匯出 (產生四格格式) ---
+    document.getElementById('exportBtn4').addEventListener('click', function() {
+        const dateInput = document.getElementById('appointmentDate').value;
+        if (!dateInput) {
+            setStatus("⚠️ 請先在步驟 4 選擇【預約進貨日】！", "#c0392b", '#fdedec');
+            return;
+        }
+
+        // 把瀏覽器原生的 2026-03-25 轉成你要的 2026/03/25
+        const formattedDate = dateInput.replace(/-/g, '/');
+
+        const step4ExportData = [];
+        const trs = document.querySelectorAll('#dataBody tr');
+
+        trs.forEach(tr => {
+            const partNo = tr.querySelector('.part-no').value.trim();
+            if (partNo === '') return; // 略過空白行
+
+            const qty = tr.querySelector('.qty').value.trim();
+            const orderSpanText = tr.querySelector('.order-result').innerText;
+            
+            // 抓出「單號」文字 (過濾掉打勾或叉叉符號)
+            let finalOrderNo = '';
+            if (orderSpanText.startsWith('✅')) {
+                finalOrderNo = orderSpanText.replace('✅', '').trim();
+            } else if (orderSpanText.startsWith('❌')) {
+                finalOrderNo = '找不到單號';
+            }
+
+            // 組裝你要求的四個欄位
+            step4ExportData.push({
+                '進貨單號': finalOrderNo,
+                '預約進貨日': formattedDate,
+                '預約進貨數': qty,
+                '超額說明': '新品'
+            });
+        });
+
+        if (step4ExportData.length === 0) {
+            setStatus("⚠️ 表格中沒有資料可以匯出，請先完成上方步驟！", "#c0392b", '#fdedec');
+            return;
+        }
+
+        const newSheet = XLSX.utils.json_to_sheet(step4ExportData);
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, newSheet, "預約進貨單");
+        
+        XLSX.writeFile(newWorkbook, `預約進貨單_${formattedDate.replace(/\//g, '')}.xlsx`);
+        
+        setStatus(`🎉 預約進貨單 (${formattedDate}) 已成功匯出下載！`, "#e67e22", '#fdf2e9');
+    });
 
 </script>
 
